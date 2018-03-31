@@ -1,0 +1,6 @@
+
+mvn compile
+mvn compile assembly:single
+java -jar COMP535-1.0-SNAPSHOT-jar-with-dependencies.jar ../conf/router1.conf
+//Specify the rounter config you want to spawn
+attach 192.168.0.183 5002 192.168.1.2 1
