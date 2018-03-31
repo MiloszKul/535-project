@@ -56,13 +56,13 @@ public class Router {
               portNumber=attach(received.srcProcessIP,received.srcProcessPort,received.srcIP,(short) 1);
             }
 
-            //start heartbeat sending 
+            //start heartbeat reception wait
             //cancel timer and initiate new 1
             if(connectionTimers[portNumber] !=null){
               connectionTimers[portNumber].cancel();
             }
             //initiate a new timer  if a heartbeat was recieved
-            connectionTimers[portNumber] = new HeartbeatTask((short)portNumber);
+            connectionTimers[portNumber] = new HeartbeatTask((short)portNumber,1);
             //start the task
             timer.schedule(connectionTimers[portNumber],timeout);
 
