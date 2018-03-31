@@ -5,9 +5,12 @@ public class HeartbeatTask extends TimerTask {
     private short port;
     //1=disconnect, 2 = send heartbeat
     int type;
-    public HeartbeatTask(short port,int type){
+    //router instance for running methods;
+    Router router;
+    public HeartbeatTask(short port,int type,Router router){
         this.port=port;
         this.type=type;
+        this.router=router;
     }
     @Override
     public void run() {
@@ -15,9 +18,12 @@ public class HeartbeatTask extends TimerTask {
 
         if(type==1){
             //TODO need to run disconnect here
+            router.disconnect(port);
         }
         if(type==2){
             //TODO need to send heartbeat here
+            //need new method to run a sender here
+            router.ping(port);
         }
     }
 }

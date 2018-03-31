@@ -8,7 +8,7 @@
 /Users/milosz/Desktop/535-working/src/main/java/socs/network/Main.java
 /Users/milosz/Desktop/535-working/src/main/java/socs/network/node/RouterDescription.java
 /Users/milosz/Desktop/535-working/src/main/java/socs/network/node/Router.java
-/Users/milosz/Desktop/535-working/src/main/java/socs/network/node/disconnectSchedule.java
+/Users/milosz/Desktop/535-working/src/main/java/socs/network/node/HeartbeatTask.java
 /Users/milosz/Desktop/535-working/src/main/java/socs/network/message/SOSPFPacket.java
 /Users/milosz/Desktop/535-working/src/main/java/socs/network/message/LinkDescription.java
 /Users/milosz/Desktop/535-working/src/main/java/socs/network/node/Link.java

@@ -16,7 +16,8 @@ import socs.network.message.SOSPFPacket;
 import socs.network.util.Configuration;
 
 public class Router {
-
+  //pass by for heartbeat giving weird error due to threads??
+  private Router router=this;
   protected LinkStateDatabase lsd;
 
   private int timeout=10000;//10 secs timeout setting between heartbeats
@@ -62,7 +63,7 @@ public class Router {
               connectionTimers[portNumber].cancel();
             }
             //initiate a new timer  if a heartbeat was recieved
-            connectionTimers[portNumber] = new HeartbeatTask((short)portNumber,1);
+            connectionTimers[portNumber] = new HeartbeatTask((short)portNumber,1,router);
             //start the task
             timer.schedule(connectionTimers[portNumber],timeout);
 
@@ -202,7 +203,13 @@ public class Router {
      // String path = lsd.getShortestPath(destinationIP);
       System.out.println(lsd.getShortestPath(destinationIP));
   }
-
+  public void ping(short portnumber){
+    //initiate send hello ping here
+  }
+  public void disconnect(short portnumber){
+    //calls process detect are we allowed to change methods to public ? if so just change process Disconnect to public
+    processDisconnect(portnumber);
+  }
   /**
    * disconnect with the router identified by the given destination ip address
    * Notice: this command should trigger the synchronization of database
@@ -339,7 +346,11 @@ public class Router {
               ObjectInputStream input = new ObjectInputStream(client.getInputStream());
               
 
-              //initiate client side heart beat sender here 
+              HeartbeatTask heartbeat = new HeartbeatTask((short)i,2,router);
+              //start the task
+              timer.schedule(heartbeat,0,timeout-5);//timeout at offset for lag needed??
+
+
 
               //change connection status if packet type 0 is recieved
               SOSPFPacket inPacket = (SOSPFPacket)input.readObject();
