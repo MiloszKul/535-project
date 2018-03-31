@@ -19,7 +19,7 @@ public class Router {
 
   protected LinkStateDatabase lsd;
 
-  private int timeout=10000;//10 secs timeout setting 
+  private int timeout=10000;//10 secs timeout setting between heartbeats
   TimerTask[] connectionTimers =   new TimerTask[4]; //array for timing the 4 ports on network
   private Timer timer = new Timer(true);
   RouterDescription rd = new RouterDescription();
@@ -55,16 +55,16 @@ public class Router {
             if(portNumber == -1){
               portNumber=attach(received.srcProcessIP,received.srcProcessPort,received.srcIP,(short) 1);
             }
-            System.out.println("timer start");
+
+            //start heartbeat sending 
             //cancel timer and initiate new 1
             if(connectionTimers[portNumber] !=null){
               connectionTimers[portNumber].cancel();
             }
-            //initiate a new timer 
-            connectionTimers[portNumber] = new disconnectSchedule((short)portNumber);
+            //initiate a new timer  if a heartbeat was recieved
+            connectionTimers[portNumber] = new HeartbeatTask((short)portNumber);
             //start the task
             timer.schedule(connectionTimers[portNumber],timeout);
-            
 
             //retrieve the attachment status set appropriate status if it doesnt
             RouterDescription crd = ports[portNumber].router2;
@@ -337,6 +337,9 @@ public class Router {
 
               //Now wait for reply.
               ObjectInputStream input = new ObjectInputStream(client.getInputStream());
+              
+
+              //initiate client side heart beat sender here 
 
               //change connection status if packet type 0 is recieved
               SOSPFPacket inPacket = (SOSPFPacket)input.readObject();
