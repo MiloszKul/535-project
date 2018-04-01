@@ -142,7 +142,6 @@ public class Router {
       receiverTimers[portNumber].schedule(receiverTimerTasks[portNumber],timeout);
     }
 
-
     //create sender if necessary
     if(senderTimerTasks[portNumber] == null){
       //instantiate a timer for this sender
@@ -240,11 +239,6 @@ public class Router {
   }
 
   public void ping(short portNumber){
-    if(ports[portNumber] == null){ //port has been disconnected, so cancel this sender
-      heartBeatCancel(portNumber);
-      return;
-    }
-
     RouterDescription crd = ports[portNumber].router2;
     SOSPFPacket hello = new SOSPFPacket();
     hello.dstIP = crd.simulatedIPAddress;
@@ -257,17 +251,18 @@ public class Router {
                                 ports[portNumber].router2.processPortNumber);
       ObjectOutputStream output = new ObjectOutputStream(client.getOutputStream());
       output.writeObject(hello);
-      // System.out.println(router.rd.simulatedIPAddress + "  " + router.rd.processPortNumber + " Sent hello to " + 
-      //                    ports[portnumber].router2.simulatedIPAddress + " port:" +
-      //                    ports[portnumber].router2.processPortNumber);
+      client.close();
+
     }catch(IOException e){
-      e.printStackTrace();
+      //error is expected here if other router quit and has not timed out yet
     }
   }
 
-  public void disconnect(short portnumber){
+  public void disconnect(short portNumber){
     //calls process detect are we allowed to change methods to public ? if so just change process Disconnect to public
-    processDisconnect(portnumber);
+    System.out.println("No ping received from " + ports[portNumber].router2.simulatedIPAddress + " disconnecting");
+    System.out.print(">>");
+    processDisconnect(portNumber);
   }
   /**
    * disconnect with the router identified by the given destination ip address
@@ -508,10 +503,15 @@ public class Router {
    * output the neighbors of the routers
    */
   private void processNeighbors() {
+    boolean noNeighbors=true;
     for(int i =0; i < 4; i++){
       if(ports[i] != null && ports[i].router2.status == RouterStatus.TWO_WAY){
+        noNeighbors=false;
         System.out.println("(port,IP) address of neighbor (" + i + ","+ports[i].router2.simulatedIPAddress + ")");
       }
+    }
+    if(noNeighbors){
+      System.out.println("no neighbors exist");
     }
   }
 
@@ -519,12 +519,11 @@ public class Router {
    * disconnect with all neighbors and quit the program
    */
   private void processQuit() {
-    //Cancel timer threads first for good measure.
-    for(int i = 0 ; i < 4; i++){
-      if(receiverTimers[i] != null)
-        receiverTimers[i].cancel();
-      if(senderTimers[i] != null)
-        senderTimers[i].cancel();
+    //cancel threads for good measure
+    for(int i=0;i<ports.length;i++){
+      if(ports[i]!=null){
+        heartBeatCancel((short) i);
+      }
     }
     System.exit(0);
   }
