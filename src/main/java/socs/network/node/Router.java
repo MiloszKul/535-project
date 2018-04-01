@@ -21,7 +21,8 @@ public class Router {
   protected LinkStateDatabase lsd;
 
   private int timeout=10000;//10 secs timeout setting between heartbeats
-  TimerTask[] connectionTimers =   new TimerTask[4]; //array for timing the 4 ports on network
+  TimerTask[] receiverTimers =   new TimerTask[4]; //array for timing the 4 ports on network
+  TimerTask[] senderTimers = new TimerTask[4];
   private Timer timer = new Timer(true);
   RouterDescription rd = new RouterDescription();
 
@@ -60,12 +61,12 @@ public class Router {
             //start heartbeat reception wait
             //cancel timer and initiate new 1
             if(connectionTimers[portNumber] !=null){
-              connectionTimers[portNumber].cancel();
+              receiverTimers[portNumber].cancel();
             }
             //initiate a new timer  if a heartbeat was recieved
-            connectionTimers[portNumber] = new HeartbeatTask((short)portNumber,1,router);
+            receiverTimers[portNumber] = new HeartbeatTask((short)portNumber,1,router);
             //start the task
-            timer.schedule(connectionTimers[portNumber],timeout);
+            timer.schedule(receiverTimers[portNumber],timeout);
 
             //retrieve the attachment status set appropriate status if it doesnt
             RouterDescription crd = ports[portNumber].router2;
@@ -344,11 +345,10 @@ public class Router {
 
               //Now wait for reply.
               ObjectInputStream input = new ObjectInputStream(client.getInputStream());
-              
+              senderTimers[i]= new HeartbeatTask((short)i,2,router);
 
-              HeartbeatTask heartbeat = new HeartbeatTask((short)i,2,router);
               //start the task
-              timer.schedule(heartbeat,0,timeout-5);//timeout at offset for lag needed??
+              timer.schedule(senderTimers[i],0,timeout-5);//timeout at offset for lag needed??
 
 
 
