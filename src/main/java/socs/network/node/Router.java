@@ -68,17 +68,25 @@ public class Router {
             //start the task
             timer.schedule(receiverTimers[portNumber],timeout);
 
+            if(senderTimers[portNumber] != null){
+              senderTimers[portNumber].cancel();
+            }
+            senderTimers[portNumber] = new HeartbeatTask((short)portNumber, 2, router);
+            timer.schedule(senderTimers[portNumber],0, timeout/2);
             //retrieve the attachment status set appropriate status if it doesnt
             RouterDescription crd = ports[portNumber].router2;
 
             if(received.sospfType == 0){
                 System.out.println();
-                System.out.println("received HELLO from " + received.srcIP + ";");
+                System.out.println("received HELLO from " + received.srcIP + ";" 
+                                    + (received.ping ? "(ping)" : ""));
+                if(received.ping) return; //just a ping so return
               if(crd.status == null){
                 crd.status = RouterStatus.INIT;
               }
-              else
-              crd.status = RouterStatus.TWO_WAY;
+              else{
+                crd.status = RouterStatus.TWO_WAY;
+              }
               crd.simulatedIPAddress = received.srcIP;
               System.out.println("set " + crd.simulatedIPAddress + " state to " + crd.status + ";");
           
@@ -204,9 +212,34 @@ public class Router {
      // String path = lsd.getShortestPath(destinationIP);
       System.out.println(lsd.getShortestPath(destinationIP));
   }
+
   public void ping(short portnumber){
-    //initiate send hello ping here
+    if(ports[portnumber] == null){ //port has been disconnected, so cancel this sender
+      System.out.println("Sender timer is pinging null port");
+      senderTimers[portnumber].cancel();
+      senderTimers[portnumber] = null;
+      return;
+    }
+    RouterDescription crd = ports[portnumber].router2;
+    SOSPFPacket hello = new SOSPFPacket();
+    hello.dstIP = crd.simulatedIPAddress;
+    hello.sospfType = 0;
+    hello.srcIP = rd.simulatedIPAddress;
+    hello.srcProcessPort = rd.processPortNumber;
+    hello.ping = true;
+    try{
+      Socket client = new Socket(ports[portnumber].router2.processIPAddress,
+                                ports[portnumber].router2.processPortNumber);
+      ObjectOutputStream output = new ObjectOutputStream(client.getOutputStream());
+      output.writeObject(hello);
+      // System.out.println(router.rd.simulatedIPAddress + "  " + router.rd.processPortNumber + " Sent hello to " + 
+      //                    ports[portnumber].router2.simulatedIPAddress + " port:" +
+      //                    ports[portnumber].router2.processPortNumber);
+    }catch(IOException e){
+      e.printStackTrace();
+    }
   }
+
   public void disconnect(short portnumber){
     //calls process detect are we allowed to change methods to public ? if so just change process Disconnect to public
     processDisconnect(portnumber);
@@ -214,11 +247,27 @@ public class Router {
   /**
    * disconnect with the router identified by the given destination ip address
    * Notice: this command should trigger the synchronization of database
-   *
+   * @TODO: remove the sender heartbeat task, the LSA from LSD and set that port to null then broadcast.
    * @param portNumber the port number which the link attaches at
    */
   private void processDisconnect(short portNumber) {
+    //Remove sender/Receiver heartbeat task.
+    removeTimers(portNumber);
 
+    //Remove LSD info.
+    lsd.removeLink(ports[portNumber].router2.simulatedIPAddress);
+
+    //Set port to null.
+    ports[portNumber] = null;
+
+    //Broadcast to neighbors.
+    lsaBroadcast();
+    
+  }
+
+  private void removeTimers(short portNumber){
+    senderTimers[portNumber].cancel();
+    receiverTimers[portNumber].cancel();
   }
 
   /**
@@ -348,8 +397,10 @@ public class Router {
               senderTimers[i]= new HeartbeatTask((short)i,2,router);
 
               //start the task
-              timer.schedule(senderTimers[i],0,timeout-5);//timeout at offset for lag needed??
+              timer.schedule(senderTimers[i],0,timeout/2);//timeout at offset for lag needed??
 
+              receiverTimers[i] = new HeartbeatTask((short)i, 1, router);
+              timer.schedule(receiverTimers[i],timeout);
 
 
               //change connection status if packet type 0 is recieved
@@ -429,7 +480,14 @@ public class Router {
    */
   private void processConnect(String processIP, short processPort,
                               String simulatedIP, short weight) {
-
+    int portNumber = attachExists(processIP,processPort);
+    if(portNumber == -1){
+      portNumber = attach(processIP, processPort, simulatedIP, weight);
+    }else{ //If port number != -1, then this link has already been added. 
+      if(ports[portNumber].router2.status == RouterStatus.TWO_WAY)
+        return; //If TWO_WAY already established, we don't need to send again.
+    }
+    processStart();
   }
 
   /**
@@ -438,7 +496,7 @@ public class Router {
   private void processNeighbors() {
     for(int i =0; i < 4; i++){
       if(ports[i] != null && ports[i].router2.status == RouterStatus.TWO_WAY){
-        System.out.println("IP address of neighbor "+ i +ports[i].router2.simulatedIPAddress);
+        System.out.println("(port,IP) address of neighbor (" + i + ","+ports[i].router2.simulatedIPAddress + ")");
       }
     }
   }
@@ -447,7 +505,14 @@ public class Router {
    * disconnect with all neighbors and quit the program
    */
   private void processQuit() {
-
+    //Cancel timer threads first for good measure.
+    for(int i = 0 ; i < 4; i++){
+      if(receiverTimers[i] != null)
+        receiverTimers[i].cancel();
+      if(senderTimers[i] != null)
+        senderTimers[i].cancel();
+    }
+    System.exit(0);
   }
 
   public void terminal() {

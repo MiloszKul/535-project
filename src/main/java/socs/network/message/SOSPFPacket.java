@@ -17,6 +17,7 @@ public class SOSPFPacket implements Serializable {
   //common header
   public short sospfType; //0 - HELLO, 1 - LinkState Update
   public String routerID;
+  public boolean ping;
 
   //used by HELLO message to identify the sender of the message
   //e.g. when router A sends HELLO to its neighbor, it has to fill this field with its own

@@ -52,6 +52,24 @@ public class LinkStateDatabase {
   }
 
   /**
+   * Removes specified link. 
+   * @param lsdIP IP address of router we are removing from LSD.
+   */
+  public void removeLink(String lsdIP){
+    //First remove link from this routers LSA.
+    LSA thisLSA = _store.get(rd.simulatedIPAddress);
+    for(LinkDescription ld : thisLSA.links){
+      if(ld.linkID.equals(lsdIP)){
+        thisLSA.links.remove(ld);
+        thisLSA.lsaSeqNumber++;
+      }
+    }
+
+    //Remove that routers lsa from this routers LSD
+    _store.remove(lsdIP);
+  }
+
+  /**
    * Returns vecotr of LSA, to be added in LSA update.
    */
   public Vector<LSA> getLSA(){

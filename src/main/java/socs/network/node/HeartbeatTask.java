@@ -14,15 +14,16 @@ public class HeartbeatTask extends TimerTask {
     }
     @Override
     public void run() {
-        System.out.println("disconnecting " + port);
 
         if(type==1){
             //TODO need to run disconnect here
+            System.out.println("disconnecting " + port);
             router.disconnect(port);
         }
         if(type==2){
             //TODO need to send heartbeat here
             //need new method to run a sender here
+            System.out.println("pinging port " + port);
             router.ping(port);
         }
     }
