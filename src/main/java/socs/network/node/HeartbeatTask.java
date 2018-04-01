@@ -23,7 +23,6 @@ public class HeartbeatTask extends TimerTask {
         if(type==2){
             //TODO need to send heartbeat here
             //need new method to run a sender here
-            System.out.println("pinging port " + port);
             router.ping(port);
         }
     }

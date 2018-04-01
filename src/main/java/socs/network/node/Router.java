@@ -20,10 +20,16 @@ public class Router {
   private Router router=this;
   protected LinkStateDatabase lsd;
 
-  private int timeout=10000;//10 secs timeout setting between heartbeats
-  TimerTask[] receiverTimers =   new TimerTask[4]; //array for timing the 4 ports on network
-  TimerTask[] senderTimers = new TimerTask[4];
-  private Timer timer = new Timer(true);
+  private int timeout=20000;//10 secs timeout setting between heartbeats
+  //receiver tasks tracking
+  TimerTask[] receiverTimerTasks= new TimerTask[4];
+  //receiver timers
+  Timer[] receiverTimers = new Timer[4];
+  //sender tasks tracking
+  TimerTask[] senderTimerTasks = new TimerTask[4];
+  //sender timers 
+  Timer[] senderTimers = new Timer[4];
+
   RouterDescription rd = new RouterDescription();
 
   //assuming that all routers are with 4 ports
@@ -51,36 +57,18 @@ public class Router {
             //Read packet from new link.
             SOSPFPacket received;
             received = (SOSPFPacket)input.readObject();
-            
             //verification that this attachement already exists create if it does not
             int portNumber=attachExists(received.srcIP,received.srcProcessPort);
             if(portNumber == -1){
               portNumber=attach(received.srcProcessIP,received.srcProcessPort,received.srcIP,(short) 1);
             }
+            //heartbeat config for this connection
+            heartBeatConfig(portNumber);
 
-            //start heartbeat reception wait
-            //cancel timer and initiate new 1
-            if(receiverTimers[portNumber] !=null){
-              receiverTimers[portNumber].cancel();
-            }
-            //initiate a new timer  if a heartbeat was recieved
-            receiverTimers[portNumber] = new HeartbeatTask((short)portNumber,1,router);
-            //start the task
-            timer.schedule(receiverTimers[portNumber],timeout);
-
-            if(senderTimers[portNumber] != null){
-              senderTimers[portNumber].cancel();
-            }
-            senderTimers[portNumber] = new HeartbeatTask((short)portNumber, 2, router);
-            timer.schedule(senderTimers[portNumber],0, timeout/2);
             //retrieve the attachment status set appropriate status if it doesnt
             RouterDescription crd = ports[portNumber].router2;
-
             if(received.sospfType == 0){
-                System.out.println();
-                System.out.println("received HELLO from " + received.srcIP + ";" 
-                                    + (received.ping ? "(ping)" : ""));
-                if(received.ping) return; //just a ping so return
+              if(received.ping) continue; //just a ping so return
               if(crd.status == null){
                 crd.status = RouterStatus.INIT;
               }
@@ -138,7 +126,45 @@ public class Router {
       System.out.println(e);
     }
   }
+  //heart beat sender and receiver config for cleaner code
+  private void heartBeatConfig(int portNumber){
 
+    //cancel reception timer if the port is not there 
+    if(receiverTimerTasks[portNumber] !=null){
+      receiverTimers[portNumber].cancel();
+      receiverTimers[portNumber] = new Timer(true);
+      receiverTimerTasks[portNumber] = new HeartbeatTask((short)portNumber,1,router);
+      receiverTimers[portNumber].schedule(receiverTimerTasks[portNumber],timeout);
+    }else{
+      receiverTimers[portNumber] = new Timer(true);
+      //initiate a new task if this 1 was not already configured
+      receiverTimerTasks[portNumber] = new HeartbeatTask((short)portNumber,1,router);
+      receiverTimers[portNumber].schedule(receiverTimerTasks[portNumber],timeout);
+    }
+
+
+    //create sender if necessary
+    if(senderTimerTasks[portNumber] == null){
+      //instantiate a timer for this sender
+      senderTimers[portNumber] = new Timer(true);
+      //initiate a new task if this 1 was not already configured
+      senderTimerTasks[portNumber] = new HeartbeatTask((short)portNumber, 2, router);
+      //start the sender task at half the timeout
+      senderTimers[portNumber].schedule(senderTimerTasks[portNumber],0,timeout/2);
+    }
+  }
+  //kills heart beat operation for specific port
+  private void heartBeatCancel(short portNumber){
+    receiverTimers[portNumber].cancel();
+    receiverTimers[portNumber]=null;
+    receiverTimerTasks[portNumber].cancel();
+    receiverTimerTasks[portNumber]=null;
+
+    senderTimers[portNumber].cancel();
+    senderTimers[portNumber]=null;
+    senderTimerTasks[portNumber].cancel();
+    senderTimerTasks[portNumber]=null;
+  }
   /**
    * Handles server lsa updates.
    * Receives lsa Packet, need to determine if any updates took place.
@@ -213,14 +239,13 @@ public class Router {
       System.out.println(lsd.getShortestPath(destinationIP));
   }
 
-  public void ping(short portnumber){
-    if(ports[portnumber] == null){ //port has been disconnected, so cancel this sender
-      System.out.println("Sender timer is pinging null port");
-      senderTimers[portnumber].cancel();
-      senderTimers[portnumber] = null;
+  public void ping(short portNumber){
+    if(ports[portNumber] == null){ //port has been disconnected, so cancel this sender
+      heartBeatCancel(portNumber);
       return;
     }
-    RouterDescription crd = ports[portnumber].router2;
+
+    RouterDescription crd = ports[portNumber].router2;
     SOSPFPacket hello = new SOSPFPacket();
     hello.dstIP = crd.simulatedIPAddress;
     hello.sospfType = 0;
@@ -228,8 +253,8 @@ public class Router {
     hello.srcProcessPort = rd.processPortNumber;
     hello.ping = true;
     try{
-      Socket client = new Socket(ports[portnumber].router2.processIPAddress,
-                                ports[portnumber].router2.processPortNumber);
+      Socket client = new Socket(ports[portNumber].router2.processIPAddress,
+                                ports[portNumber].router2.processPortNumber);
       ObjectOutputStream output = new ObjectOutputStream(client.getOutputStream());
       output.writeObject(hello);
       // System.out.println(router.rd.simulatedIPAddress + "  " + router.rd.processPortNumber + " Sent hello to " + 
@@ -252,7 +277,7 @@ public class Router {
    */
   private void processDisconnect(short portNumber) {
     //Remove sender/Receiver heartbeat task.
-    removeTimers(portNumber);
+    heartBeatCancel(portNumber);
 
     //Remove LSD info.
     lsd.removeLink(ports[portNumber].router2.simulatedIPAddress);
@@ -263,11 +288,6 @@ public class Router {
     //Broadcast to neighbors.
     lsaBroadcast();
     
-  }
-
-  private void removeTimers(short portNumber){
-    senderTimers[portNumber].cancel();
-    receiverTimers[portNumber].cancel();
   }
 
   /**
@@ -394,13 +414,7 @@ public class Router {
 
               //Now wait for reply.
               ObjectInputStream input = new ObjectInputStream(client.getInputStream());
-              senderTimers[i]= new HeartbeatTask((short)i,2,router);
-
-              //start the task
-              timer.schedule(senderTimers[i],0,timeout/2);//timeout at offset for lag needed??
-
-              receiverTimers[i] = new HeartbeatTask((short)i, 1, router);
-              timer.schedule(receiverTimers[i],timeout);
+              heartBeatConfig(i);
 
 
               //change connection status if packet type 0 is recieved
