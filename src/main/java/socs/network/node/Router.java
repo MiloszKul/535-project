@@ -60,7 +60,7 @@ public class Router {
 
             //start heartbeat reception wait
             //cancel timer and initiate new 1
-            if(connectionTimers[portNumber] !=null){
+            if(receiverTimers[portNumber] !=null){
               receiverTimers[portNumber].cancel();
             }
             //initiate a new timer  if a heartbeat was recieved
