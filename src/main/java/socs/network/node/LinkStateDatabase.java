@@ -4,6 +4,7 @@ import socs.network.message.LSA;
 import socs.network.message.LinkDescription;
 import java.util.Vector;
 import java.util.HashMap;
+import java.util.Iterator;
 import socs.network.node.NetworkGraph;
 
 public class LinkStateDatabase {
@@ -58,9 +59,12 @@ public class LinkStateDatabase {
   public void removeLink(String lsdIP){
     //First remove link from this routers LSA.
     LSA thisLSA = _store.get(rd.simulatedIPAddress);
-    for(LinkDescription ld : thisLSA.links){
+    Iterator<LinkDescription> iter = thisLSA.links.iterator();
+    LinkDescription ld;
+    while(iter.hasNext()){
+      ld = iter.next();
       if(ld.linkID.equals(lsdIP)){
-        thisLSA.links.remove(ld);
+        iter.remove();
         thisLSA.lsaSeqNumber++;
       }
     }
