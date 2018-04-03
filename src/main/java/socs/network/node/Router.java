@@ -20,7 +20,7 @@ public class Router {
   private Router router=this;
   protected LinkStateDatabase lsd;
 
-  private int timeout=20000;//10 secs timeout setting between heartbeats
+  private int timeout=1000;//10 secs timeout setting between heartbeats
   //receiver tasks tracking
   TimerTask[] receiverTimerTasks= new TimerTask[4];
   //receiver timers
