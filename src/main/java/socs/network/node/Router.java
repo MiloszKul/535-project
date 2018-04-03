@@ -251,7 +251,7 @@ public class Router {
                                 ports[portNumber].router2.processPortNumber);
       ObjectOutputStream output = new ObjectOutputStream(client.getOutputStream());
       output.writeObject(hello);
-      client.close();
+      //client.close();
 
     }catch(IOException e){
       //error is expected here if other router quit and has not timed out yet
@@ -386,7 +386,7 @@ public class Router {
     Thread sender = new Thread(){
         public void run(){
         for(short i = 0; i< 4; i++){
-          if(ports[i] != null){
+          if(ports[i] != null && ports[i].router2.status == null){
             try{
               System.out.println();
               //create socket between local and remote
@@ -493,8 +493,8 @@ public class Router {
     if(portNumber == -1){
       portNumber = attach(processIP, processPort, simulatedIP, weight);
     }else{ //If port number != -1, then this link has already been added. 
-      if(ports[portNumber].router2.status == RouterStatus.TWO_WAY)
-        return; //If TWO_WAY already established, we don't need to send again.
+      if(ports[portNumber].router2.status != null)
+        return; //If status is not null, then connection is being established.
     }
     processStart();
   }
@@ -549,7 +549,7 @@ public class Router {
                   cmdLine[3], Short.parseShort(cmdLine[4]));
         } else if (command.equals("start")) {
           processStart();
-        } else if (command.equals("connect ")) {
+        } else if (command.startsWith("connect ")) {
           String[] cmdLine = command.split(" ");
           processConnect(cmdLine[1], Short.parseShort(cmdLine[2]),
                   cmdLine[3], Short.parseShort(cmdLine[4]));
