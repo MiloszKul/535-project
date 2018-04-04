@@ -20,7 +20,7 @@ public class Router {
   private Router router=this;
   protected LinkStateDatabase lsd;
 
-  private int timeout=1000;//10 secs timeout setting between heartbeats
+  private int timeout=5000;//10 secs timeout setting between heartbeats
   //receiver tasks tracking
   TimerTask[] receiverTimerTasks= new TimerTask[4];
   //receiver timers
@@ -60,7 +60,7 @@ public class Router {
             //verification that this attachement already exists create if it does not
             int portNumber=attachExists(received.srcIP,received.srcProcessPort);
             if(portNumber == -1){
-              portNumber=attach(received.srcProcessIP,received.srcProcessPort,received.srcIP,(short) 1);
+              portNumber=attach(received.srcProcessIP,received.srcProcessPort,received.srcIP,received.weight);
             }
             //heartbeat config for this connection
             heartBeatConfig(portNumber);
@@ -149,20 +149,29 @@ public class Router {
       //initiate a new task if this 1 was not already configured
       senderTimerTasks[portNumber] = new HeartbeatTask((short)portNumber, 2, router);
       //start the sender task at half the timeout
-      senderTimers[portNumber].schedule(senderTimerTasks[portNumber],0,timeout/2);
+      senderTimers[portNumber].schedule(senderTimerTasks[portNumber],timeout/2,timeout/2);
     }
+  }
+
+  private boolean isHeartBeatActive(short portNumber){
+    return (receiverTimerTasks[portNumber] != null || senderTimerTasks[portNumber] != null);
   }
   //kills heart beat operation for specific port
   private void heartBeatCancel(short portNumber){
-    receiverTimers[portNumber].cancel();
-    receiverTimers[portNumber]=null;
-    receiverTimerTasks[portNumber].cancel();
-    receiverTimerTasks[portNumber]=null;
-
-    senderTimers[portNumber].cancel();
-    senderTimers[portNumber]=null;
-    senderTimerTasks[portNumber].cancel();
-    senderTimerTasks[portNumber]=null;
+    if(receiverTimers[portNumber] != null){
+      receiverTimers[portNumber].cancel();
+      receiverTimers[portNumber].purge();
+      receiverTimers[portNumber]=null;
+      receiverTimerTasks[portNumber].cancel();
+      receiverTimerTasks[portNumber]=null;
+    }
+    if(senderTimers[portNumber] != null){
+      senderTimers[portNumber].cancel();
+      senderTimers[portNumber].purge();
+      senderTimers[portNumber]=null;
+      senderTimerTasks[portNumber].cancel();
+      senderTimerTasks[portNumber]=null;
+    }
   }
   /**
    * Handles server lsa updates.
@@ -219,7 +228,7 @@ public class Router {
             output = new ObjectOutputStream(client.getOutputStream());
             output.writeObject(lsp);
           }catch(Exception e){
-            e.printStackTrace();
+            //e.printStackTrace();
           }
         }
       }
@@ -245,6 +254,7 @@ public class Router {
     hello.sospfType = 0;
     hello.srcIP = rd.simulatedIPAddress;
     hello.srcProcessPort = rd.processPortNumber;
+    hello.srcProcessIP = rd.processIPAddress;
     hello.ping = true;
     try{
       Socket client = new Socket(ports[portNumber].router2.processIPAddress,
@@ -271,6 +281,10 @@ public class Router {
    * @param portNumber the port number which the link attaches at
    */
   private void processDisconnect(short portNumber) {
+    if(ports[portNumber] == null){
+      System.out.println("Port is not active.");
+      return;
+    }
     //Remove sender/Receiver heartbeat task.
     heartBeatCancel(portNumber);
 
@@ -349,7 +363,9 @@ public class Router {
       Link link = new Link(rd, rR, weight);
       //save link in this port
       ports[port] = link;
-
+      if(isHeartBeatActive((short)port)){
+        disconnect((short)port);
+      }
       return port;
     }
     //no empty ports
@@ -403,13 +419,14 @@ public class Router {
               outPacket.dstIP = ports[i].router2.simulatedIPAddress;
               ports[i].router2.status = RouterStatus.INIT;
               outPacket.sospfType = 0;
+              outPacket.weight = ports[i].weight;
               outPacket.srcIP = rd.simulatedIPAddress;
               outPacket.srcProcessPort = rd.processPortNumber;
               output.writeObject(outPacket);
 
               //Now wait for reply.
               ObjectInputStream input = new ObjectInputStream(client.getInputStream());
-              heartBeatConfig(i);
+              //heartBeatConfig(i);
 
 
               //change connection status if packet type 0 is recieved
@@ -433,6 +450,7 @@ public class Router {
               ld.portNum = i;
               ld.tosMetrics = ports[i].weight;
               lsd.addLink(rd.simulatedIPAddress,ld);
+              heartBeatConfig(i);
 
               System.out.print(">>");
             }catch(Exception e){
